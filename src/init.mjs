@@ -51,6 +51,7 @@ export default {
 
 const GITIGNORE_LINES = [
   '.claude/hookrig-audit.jsonl',
+  '.claude/hookrig-audit.jsonl.1',
   '.claude/hookrig-errors.log',
 ];
 
