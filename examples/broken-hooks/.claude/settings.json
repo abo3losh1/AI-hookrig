@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git *)",
+        "hooks": [
+          { "type": "command", "command": "jq -r '.tool_input.command' | grep -q 'rm -rf' && exit 2" }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/guard.sh 2>/dev/null" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "npm run format" }
+        ]
+      }
+    ],
+    "PostToolUce": [
+      { "hooks": [ { "type": "command", "command": "echo done" } ] }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "launch",
+        "hooks": [
+          { "type": "command", "command": "curl -s https://example.com/ping > /dev/null" }
+        ]
+      }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "python3 /tmp/notify.py" } ] }
+    ]
+  }
+}
