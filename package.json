@@ -30,12 +30,11 @@
   "files": [
     "bin",
     "src",
-    "templates",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test \"test/**/*.test.mjs\"",
+    "test": "node scripts/test.mjs",
     "doctor": "node bin/hookrig.mjs doctor"
   },
   "repository": {
