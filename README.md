@@ -197,7 +197,7 @@ import {
 | `blockDangerousBash({ extra, allow, ask })` | Deny `rm -rf`, `git push --force` (but not `--force-with-lease`), `git reset --hard`, `curl \| sh`, `chmod 777`, `dd of=/dev/*`, `DROP TABLE`, `npm publish`, and more. `ask: true` warns instead of blocking. |
 | `protectPaths({ globs, mode })` | Make paths read-only (`mode: 'write'`, the default) or invisible (`mode: 'all'`). |
 | `formatOnWrite({ commands })` | Run a formatter after the agent edits a file. Maps a glob to an argv array, spawned directly so paths with spaces work. |
-| `auditLog({ file, fields })` | One JSON line per event, so you can see what the agent actually did. |
+| `auditLog({ file, fields, redact, redactExtra, maxBytes })` | One JSON line per event, so you can see what the agent actually did. Credentials are redacted and the file rotates at 5 MB, both by default. |
 | `notify({ message, bell, command })` | Terminal bell plus a message. `command` is an argv array for a real desktop notifier. |
 | `addContext(textOrFn)` | Inject text into the model's context. |
 
@@ -209,6 +209,25 @@ formatOnWrite({
     '**/*.go': ['gofmt', '-w'],
   },
 })
+```
+
+### A note on the audit log
+
+`auditLog()` records full Bash command text, so a token pasted into a command
+would otherwise sit in a plaintext file forever. Anthropic, OpenAI, GitHub,
+AWS, Slack, Stripe and Google key formats are redacted, along with JWTs,
+private key blocks, `NAME_WITH_TOKEN=value` assignments, `--password` style
+flags, `Authorization:` headers and credentials embedded in URLs. Add your own
+with `redactExtra: [/acme-internal-\d+/g]`, or turn the whole thing off with
+`redact: false` if you know what is in your commands.
+
+Redaction is best effort against known formats, not a guarantee. Treat the log
+as sensitive and keep it out of version control:
+
+```
+.claude/hookrig-audit.jsonl
+.claude/hookrig-audit.jsonl.1
+.claude/hookrig-errors.log
 ```
 
 ---
