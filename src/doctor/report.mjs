@@ -45,6 +45,14 @@ export function renderText(findings, collected, { target = 'all' } = {}) {
   }
   lines.push('');
 
+  if (hooks === 0) {
+    // Saying "no problems found" here would claim a check that never ran.
+    lines.push('  No hooks configured, so there is nothing to check.');
+    lines.push(c.dim('  Run "hookrig init" to add cross-platform hooks to this project.'));
+    lines.push('');
+    return lines.join('\n');
+  }
+
   if (findings.length === 0) {
     lines.push(c.green('  No problems found. Your hooks are portable.'));
     lines.push('');
