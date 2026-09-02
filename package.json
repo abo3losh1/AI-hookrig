@@ -15,6 +15,7 @@
     "lint"
   ],
   "license": "MIT",
+  "author": "abo3losh1 <harthalane4@gmail.com>",
   "type": "module",
   "engines": {
     "node": ">=18.17"
