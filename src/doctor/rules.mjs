@@ -41,27 +41,31 @@ const POSIX_ONLY_BINARIES = [
  * The nastier class: these names DO resolve in PowerShell, as aliases to
  * cmdlets with different flags and different output. Nothing errors. The hook
  * just does the wrong thing.
+ *
+ * `exe` is the real executable that ships with Windows, when one does. Most of
+ * these have no native equivalent at all, so telling people to call `echo.exe`
+ * would send them after a binary that does not exist.
  */
 const PS_ALIASES = {
-  curl: 'Invoke-WebRequest (PowerShell 5.1) - ignores -s, -o, -H and returns an object, not text',
-  wget: 'Invoke-WebRequest (PowerShell 5.1) - same problem as curl',
-  cat: 'Get-Content - splits output into an array of lines',
-  ls: 'Get-ChildItem - different columns, no -la',
-  rm: 'Remove-Item - no -rf, prompts on non-empty directories',
-  cp: 'Copy-Item - no -r',
-  mv: 'Move-Item',
-  echo: 'Write-Output - objects, not raw text',
-  sort: 'Sort-Object - sorts objects, not lines',
-  tee: 'Tee-Object',
-  ps: 'Get-Process',
-  kill: 'Stop-Process',
-  sleep: 'Start-Sleep - takes seconds as -Seconds, not a bare arg in all forms',
-  diff: 'Compare-Object',
-  pwd: 'Get-Location',
-  where: 'Where-Object - not where.exe',
-  set: 'Set-Variable',
-  history: 'Get-History',
-  man: 'help',
+  curl: { cmdlet: 'Invoke-WebRequest (PowerShell 5.1) - ignores -s, -o, -H and returns an object, not text', exe: 'curl.exe' },
+  wget: { cmdlet: 'Invoke-WebRequest (PowerShell 5.1) - same problem as curl' },
+  cat: { cmdlet: 'Get-Content - splits output into an array of lines' },
+  ls: { cmdlet: 'Get-ChildItem - different columns, no -la' },
+  rm: { cmdlet: 'Remove-Item - no -rf, prompts on non-empty directories' },
+  cp: { cmdlet: 'Copy-Item - no -r' },
+  mv: { cmdlet: 'Move-Item' },
+  echo: { cmdlet: 'Write-Output - objects, not raw text' },
+  sort: { cmdlet: 'Sort-Object - sorts objects, not lines', exe: 'sort.exe' },
+  tee: { cmdlet: 'Tee-Object' },
+  ps: { cmdlet: 'Get-Process' },
+  kill: { cmdlet: 'Stop-Process' },
+  sleep: { cmdlet: 'Start-Sleep - takes seconds as -Seconds, not a bare arg in all forms' },
+  diff: { cmdlet: 'Compare-Object' },
+  pwd: { cmdlet: 'Get-Location' },
+  where: { cmdlet: 'Where-Object', exe: 'where.exe' },
+  set: { cmdlet: 'Set-Variable' },
+  history: { cmdlet: 'Get-History' },
+  man: { cmdlet: 'help' },
 };
 
 const HANDLER_TYPES = new Set(['command', 'http', 'mcp_tool', 'prompt', 'agent']);
@@ -476,14 +480,19 @@ rule('powershell-alias-shadow', (entry) => {
   const heads = commandHeads(stripPlaceholders(entry.handler.command));
   const hits = [...new Set(heads.map((h) => h.replace(/^.*[\\/]/, '')).filter((h) => PS_ALIASES[h]))];
   if (hits.length === 0) return [];
-  return hits.map((bin) => finding(
-    'powershell-alias-shadow',
-    bin === 'curl' || bin === 'wget' ? ERROR : WARN,
-    WIN,
-    `"${bin}" is a PowerShell alias for ${PS_ALIASES[bin]}.`,
-    'Nothing errors. The hook runs and quietly does something different, which is why this class is so hard to notice.',
-    `Call the real executable (${bin}.exe) or, better, do the work in a script and use exec form.`,
-  ));
+  return hits.map((bin) => {
+    const { cmdlet, exe } = PS_ALIASES[bin];
+    return finding(
+      'powershell-alias-shadow',
+      bin === 'curl' || bin === 'wget' ? ERROR : WARN,
+      WIN,
+      `"${bin}" is a PowerShell alias for ${cmdlet}.`,
+      'Nothing errors. The hook runs and quietly does something different, which is why this class is so hard to notice.',
+      exe
+        ? `Call ${exe} by name, which bypasses the alias, or do the work in a script and use exec form.`
+        : `Windows ships no ${bin} executable, so there is nothing to fall back to. Do the work in a Node script and call it with exec form.`,
+    );
+  });
 });
 
 rule('shell-script-direct', (entry) => {
