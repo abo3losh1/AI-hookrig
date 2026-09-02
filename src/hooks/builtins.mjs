@@ -9,7 +9,7 @@
  *   export default { hooks: { PreToolUse: [protectSecrets(), blockDangerousBash()] } };
  */
 
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 
@@ -228,10 +228,85 @@ function run(command, args, { cwd, timeout }) {
  * auditLog
  * ---------------------------------------------------------------------- */
 
-/** Append one JSON line per event, so you can see what the agent did. */
-export function auditLog({ file = '.claude/hookrig-audit.jsonl', fields } = {}) {
+/**
+ * Credentials that show up in Bash commands.
+ *
+ * An audit log records the full command text, so a token pasted into a command
+ * would otherwise sit in a plaintext file forever. Each entry keeps enough
+ * context to tell you what kind of secret was there without keeping the value.
+ */
+const SECRET_PATTERNS = [
+  { re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, to: () => tag('private-key') },
+  { re: /\bsk-ant-[A-Za-z0-9_-]{16,}/g, to: () => tag('anthropic-key') },
+  { re: /\bsk-proj-[A-Za-z0-9_-]{16,}/g, to: () => tag('openai-key') },
+  { re: /\bsk-[A-Za-z0-9]{24,}/g, to: () => tag('api-key') },
+  { re: /\bgh[pousr]_[A-Za-z0-9]{20,}/g, to: () => tag('github-token') },
+  { re: /\bgithub_pat_[A-Za-z0-9_]{20,}/g, to: () => tag('github-token') },
+  { re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, to: () => tag('aws-key-id') },
+  { re: /\bxox[baprs]-[A-Za-z0-9-]{10,}/g, to: () => tag('slack-token') },
+  { re: /\b[srp]k_(?:live|test)_[A-Za-z0-9]{16,}/g, to: () => tag('stripe-key') },
+  // Real Google keys are 35 characters after the prefix. Matched open-ended
+  // on purpose: over-redacting a credential is always the cheaper mistake.
+  { re: /\bAIza[0-9A-Za-z_-]{30,}/g, to: () => tag('google-key') },
+  { re: /\bey[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, to: () => tag('jwt') },
+  // https://user:password@host
+  { re: /([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, to: (m, scheme) => `${scheme}${tag('url-credentials')}@` },
+  // Authorization: Bearer xxx  /  -H "Authorization: Basic xxx"
+  { re: /\b((?:Bearer|Basic|Token)\s+)[A-Za-z0-9._~+/=-]{12,}/gi, to: (m, prefix) => prefix + tag('value') },
+  // ANY_NAME_WITH_KEY_OR_TOKEN=value, quoted or bare
+  {
+    re: /\b([A-Za-z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIALS?|APIKEY)[A-Za-z0-9_]*\s*=\s*)(?:"[^"]*"|'[^']*'|[^\s;|&)]+)/gi,
+    to: (m, prefix) => prefix + tag('value'),
+  },
+  // --password xxx, --token=xxx, --api-key xxx
+  {
+    re: /(--?(?:password|passwd|token|api-?key|secret|auth)(?:[= ]))(?:"[^"]*"|'[^']*'|[^\s;|&)]+)/gi,
+    to: (m, prefix) => prefix + tag('value'),
+  },
+];
+
+function tag(kind) {
+  return `[redacted:${kind}]`;
+}
+
+/** Replace credentials in a string. Exported so you can reuse it in your own hooks. */
+export function redactSecrets(text, extra = []) {
+  if (typeof text !== 'string' || !text) return text;
+  let out = text;
+  for (const { re, to } of SECRET_PATTERNS) out = out.replace(re, to);
+  for (const pattern of extra) {
+    out = out.replace(pattern instanceof RegExp ? pattern : new RegExp(pattern, 'g'), tag('custom'));
+  }
+  return out;
+}
+
+/** Walk a record and redact every string in it, including nested ones. */
+export function redactDeep(value, extra = []) {
+  if (typeof value === 'string') return redactSecrets(value, extra);
+  if (Array.isArray(value)) return value.map((v) => redactDeep(v, extra));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactDeep(v, extra)]));
+  }
+  return value;
+}
+
+/**
+ * Append one JSON line per event, so you can see what the agent did.
+ *
+ * Redaction is on by default. The log holds full command text, and a log that
+ * leaks the secrets it was meant to help you audit is worse than no log.
+ * Rotation is on by default too, because an append-only file with no bound
+ * eventually becomes the largest thing in the repo.
+ */
+export function auditLog({
+  file = '.claude/hookrig-audit.jsonl',
+  fields,
+  redact = true,
+  redactExtra = [],
+  maxBytes = 5 * 1024 * 1024,
+} = {}) {
   return (input, ctx) => {
-    const record = fields
+    const raw = fields
       ? fields(input, ctx)
       : {
           at: new Date().toISOString(),
@@ -241,15 +316,28 @@ export function auditLog({ file = '.claude/hookrig-audit.jsonl', fields } = {}) 
           paths: touchedPaths(input),
           command: input.tool_input?.command,
         };
+    const record = redact ? redactDeep(raw, redactExtra) : raw;
     try {
       const target = isAbsolute(file) ? file : join(ctx.projectDir, file);
       mkdirSync(dirname(target), { recursive: true });
+      rotate(target, maxBytes);
       appendFileSync(target, `${JSON.stringify(record)}\n`);
     } catch {
       // Never let logging break a session.
     }
     return ctx.pass();
   };
+}
+
+/** Keep one previous file and start fresh once the live one passes the cap. */
+function rotate(target, maxBytes) {
+  if (!maxBytes) return;
+  try {
+    if (statSync(target).size < maxBytes) return;
+    renameSync(target, `${target}.1`);
+  } catch {
+    // No file yet, or the rename lost a race. Either way, just keep appending.
+  }
 }
 
 /* -------------------------------------------------------------------------
