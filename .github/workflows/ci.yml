@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # The matrix is the point. A tool that claims hooks behave the same
+    # everywhere has to prove it on every platform it claims.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        node: ['18.17', '20', '22']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
+  doctor-catches-the-example:
+    # The bundled broken example must keep failing. If a refactor stops the
+    # doctor seeing it, this job goes red.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: doctor must exit 1 on examples/broken-hooks
+        shell: bash
+        run: |
+          if node bin/hookrig.mjs doctor --dir examples/broken-hooks --quiet; then
+            echo "doctor exited 0 on a file full of broken hooks"
+            exit 1
+          fi
+      - name: doctor must exit 0 on a freshly initialised project
+        shell: bash
+        run: |
+          mkdir -p .tmp/clean
+          node bin/hookrig.mjs init --dir .tmp/clean
+          node bin/hookrig.mjs doctor --dir .tmp/clean --quiet
