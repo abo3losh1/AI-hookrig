@@ -203,3 +203,14 @@ test('a clean exec-form hook pointing at a real script produces nothing', () => 
   const f = analyze(c);
   assert.deepEqual(f, [], `unexpected findings: ${JSON.stringify(ids(f))}`);
 });
+
+test('alias fixes only point at an executable Windows actually ships', () => {
+  const withExe = analyze(collected('Stop', shell('curl -s https://x/ping')))
+    .find((x) => x.id === 'powershell-alias-shadow');
+  assert.match(withExe.fix, /curl\.exe/);
+
+  const withoutExe = analyze(collected('Stop', shell('echo done')))
+    .find((x) => x.id === 'powershell-alias-shadow');
+  assert.doesNotMatch(withoutExe.fix, /echo\.exe/, 'there is no echo.exe on Windows');
+  assert.match(withoutExe.fix, /ships no echo executable/);
+});
