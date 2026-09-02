@@ -38,7 +38,7 @@ export function renderText(findings, collected, { target = 'all' } = {}) {
   lines.push(c.bold('hookrig doctor'));
   lines.push(
     c.dim(`  ${hooks} hook${hooks === 1 ? '' : 's'} across ${scanned} settings file${scanned === 1 ? '' : 's'}`) +
-      (target === 'all' ? '' : c.dim(`  ·  target ${PLATFORM_LABEL[target] ?? target}`)),
+      (target === 'all' ? '' : c.dim(`  |  target ${PLATFORM_LABEL[target] ?? target}`)),
   );
   for (const f of collected.files) {
     lines.push(c.dim(`  ${f.scope.padEnd(8)} ${short(f.file, cwd)}`));
@@ -69,7 +69,7 @@ export function renderText(findings, collected, { target = 'all' } = {}) {
     const where = f.entry.line ? `:${f.entry.line}` : '';
     const tag = LABEL[f.severity](f.severity.toUpperCase().padEnd(5));
     lines.push(`  ${tag} ${c.bold(f.message)}`);
-    lines.push(`        ${c.dim(`${f.entry.event}  ${f.entry.pointer}${where}  ·  breaks on ${platforms(f.platforms)}  ·  ${f.id}`)}`);
+    lines.push(`        ${c.dim(`${f.entry.event}  ${f.entry.pointer}${where}  |  breaks on ${platforms(f.platforms)}  |  ${f.id}`)}`);
     if (f.detail) lines.push(`        ${f.detail}`);
     if (f.fix) lines.push(`        ${c.green('fix')} ${f.fix}`);
     lines.push('');
@@ -80,7 +80,7 @@ export function renderText(findings, collected, { target = 'all' } = {}) {
     counts.error ? c.red(`${counts.error} error${counts.error === 1 ? '' : 's'}`) : null,
     counts.warn ? c.yellow(`${counts.warn} warning${counts.warn === 1 ? '' : 's'}`) : null,
     counts.info ? c.blue(`${counts.info} note${counts.info === 1 ? '' : 's'}`) : null,
-  ].filter(Boolean).join(c.dim('  ·  '));
+  ].filter(Boolean).join(c.dim('  |  '));
   lines.push(summary);
   lines.push('');
 
