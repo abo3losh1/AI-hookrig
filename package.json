@@ -1,0 +1,48 @@
+{
+  "name": "hookrig",
+  "version": "0.1.0",
+  "description": "Claude Code hooks that actually fire on Windows. Diagnose broken hooks, then run them the same way on Windows, macOS and Linux.",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "hooks",
+    "windows",
+    "powershell",
+    "cross-platform",
+    "agent",
+    "ai-coding",
+    "devtools",
+    "lint"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "bin": {
+    "hookrig": "bin/hookrig.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./hooks": "./src/hooks/index.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "doctor": "node bin/hookrig.mjs doctor"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abo3losh1/hookrig.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abo3losh1/hookrig/issues"
+  },
+  "homepage": "https://github.com/abo3losh1/hookrig#readme"
+}
