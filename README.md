@@ -50,28 +50,28 @@ npx hookrig doctor
 
 ```
 hookrig doctor
-  6 hooks across 2 settings files  ·  target Windows
+  6 hooks across 2 settings files  |  target Windows
 
 .claude/settings.json
   ERROR "jq" is not available in a stock Windows shell.
-        PreToolUse  hooks.PreToolUse[0].hooks[0]:7  ·  breaks on Windows  ·  posix-only-binary
+        PreToolUse  hooks.PreToolUse[0].hooks[0]:7  |  breaks on Windows  |  posix-only-binary
         The hook exits non-zero, and most events ignore a failing hook without surfacing anything.
         fix Parse the hook JSON in Node instead: it is already on the machine, because Claude Code needs it.
 
   ERROR "$CLAUDE_PROJECT_DIR" is expanded by PowerShell, not by the shell you wrote this for.
-        PreToolUse  hooks.PreToolUse[1].hooks[0]:13  ·  breaks on Windows  ·  unbraced-variable
+        PreToolUse  hooks.PreToolUse[1].hooks[0]:13  |  breaks on Windows  |  unbraced-variable
         PowerShell has no $CLAUDE_PROJECT_DIR variable, so it expands to an empty string and the path collapses.
         fix Write ${CLAUDE_PROJECT_DIR} with braces. Claude Code substitutes that placeholder itself, before any shell sees it.
 
   ERROR "PostToolUce" is not a Claude Code hook event, so this hook never fires.
-        PostToolUce  hooks.PostToolUce[0].hooks[0]:26  ·  breaks on all platforms  ·  unknown-event
+        PostToolUce  hooks.PostToolUce[0].hooks[0]:26  |  breaks on all platforms  |  unknown-event
         fix Did you mean "PostToolUse"?
 
   ERROR Matcher "launch" can never match a SessionStart event.
-        SessionStart  hooks.SessionStart[0].hooks[0]:32  ·  breaks on all platforms  ·  dead-matcher
+        SessionStart  hooks.SessionStart[0].hooks[0]:32  |  breaks on all platforms  |  dead-matcher
         SessionStart only ever emits: startup, resume, clear, compact, fork.
 
-13 errors  ·  2 warnings
+13 errors  |  2 warnings
 ```
 
 It reads every scope Claude Code merges hooks from (managed, user, project,
